@@ -1,0 +1,80 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'Coded by: jct
+'Project Start Date: 12/07/2010
+'Hooks: 16090
+'Customer: GKD
+'sql ATG_PU_RPT_FIELDS
+
+
+V.Local.sSelB.Declare(String)
+V.Local.sSelA.Declare(String)
+V.Local.sSelX.Declare(String)
+V.Local.sDelete.Declare(String)
+V.Local.sField.Declare(String)
+V.Local.lField.Declare(Long)
+
+F.Intrinsic.Control.If(V.Passed.009001,=,"002801")
+F.ODBC.Connection!Con.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+
+'delete existing record for the calling terminal
+F.Intrinsic.String.Concat("delete from ATG_3489_PU_RPT_FIELDS where TRMNL='",V.Caller.Terminal,"'",V.Local.sDelete)
+F.ODBC.Connection!Con.Execute(V.Local.sDelete)
+
+'open the table to write new records for the calling terminal
+F.Intrinsic.String.Concat("select * from ATG_3489_PU_RPT_FIELDS where TRMNL='",V.Caller.Terminal,"'",V.Local.sSelX)
+F.ODBC.Connection!Con.OpenRecordsetRW("rstX",V.Local.sSelX)
+
+'get the PO numbers for the printed po's
+	F.Intrinsic.String.Concat("select distinct PO_NO from PRT_LASER_PO where TERMINAL_NO='",V.Caller.Terminal,"' and RPTID='",V.Passed.009001,"'order by PO_NO",V.Local.sSelA)
+	F.ODBC.Connection!Con.OpenRecordsetRO("rstA",V.Local.sSelA)
+		F.Intrinsic.Control.DoUntil(V.ODBC.Con!rstA.EOF,=,True)
+
+'open the user field table to get the field titles
+			F.ODBC.Connection!Con.OpenRecordsetRO("rstC","select * from ATG_USER_FIELDS")
+				F.Intrinsic.Control.DoUntil(V.ODBC.Con!rstC.EOF,=,True)
+					V.Local.lField.Set(V.ODBC.Con!rstC.FieldVal!USER_FIELD_ID)
+						F.Intrinsic.String.LPad(V.Local.lField,"0",3,V.Local.sField)
+
+'get the value of the user fields
+					F.Intrinsic.String.Concat("select * from ATG_PO_USER_FIELDS where PURCHASE_ORDER='",V.ODBC.Con!rstA.FieldValTrim!PO_NO,"' and USER_FIELD_",V.Local.lField,"<>'' ",V.Local.sSelB)
+					F.ODBC.Connection!Con.OpenRecordsetRO("rstB",V.Local.sSelB)
+						F.Intrinsic.Control.If(V.ODBC.Con!rstB.EOF,=,False)
+							
+							F.ODBC.Con!rstX.AddNew
+								F.ODBC.Con!rstX.Set!TRMNL(V.Caller.Terminal)
+								F.ODBC.Con!rstX.Set!RPTID(V.Passed.009001)
+								F.ODBC.Con!rstX.Set!PURCHASE_ORDER(V.ODBC.Con!rstA.FieldValTrim!PO_NO)
+								F.ODBC.Con!rstX.Set!USER_FIELD(V.Local.sField)
+								F.ODBC.Con!rstX.Set!FIELD_TITLE(V.ODBC.Con!rstC.FieldValTrim!USER_FIELD)
+								F.ODBC.Con!rstX.Set!FIELD_TEXT(V.ODBC.Con!rstB.FieldValTrim!USER_FIELD_[v.local.lField])
+							F.ODBC.Con!rstX.Update
+
+
+						F.Intrinsic.Control.EndIf
+					F.ODBC.Con!rstB.Close
+
+				F.ODBC.Con!rstC.MoveNext
+				F.Intrinsic.Control.Loop
+			F.ODBC.Con!rstC.Close
+
+		F.ODBC.Con!rstA.MoveNext
+		F.Intrinsic.Control.Loop
+	F.ODBC.Con!rstA.Close
+
+F.ODBC.Con!rstX.Close
+
+F.ODBC.Connection!Con.Close
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.End
+
+Program.Sub.Main.End
+
+
